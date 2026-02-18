@@ -1,135 +1,201 @@
-
 ## 📌 Spring Cloud Discovery – Exemplo Simples
 
 [![My Skills](https://skillicons.dev/icons?i=spring,maven)](https://skillicons.dev)
 
-Este projeto demonstra o funcionamento do Service Discovery utilizando Spring Cloud Netflix Eureka com três aplicações:
+Este projeto demonstra o funcionamento do Service Discovery utilizando Spring Cloud Netflix Eureka e Spring Cloud Gateway com quatro aplicações:
 
 - *eureka-server* → Servidor de descoberta
 - *servicea* → Serviço cliente
 - *serviceb* → Serviço cliente
+- *gateway* → Ponto único de acesso aos serviços (roteamento)
 
 
 ## 🏗 Arquitetura
 
-            +-------------------+
-            |   Eureka Server   |
-            |     (8761)        |
-            +-------------------+
-               ↑             ↑
-               |             |
-       +--------------+  +--------------+
-       |   Service A  |  |   Service B  |
-       |    (8081)    |  |    (8082)    |
-       +--------------+  +--------------+
+```mermaid
+flowchart LR
+  Client --> Gateway["Gateway :8080"]
+  Gateway --> ServiceA["Service A :8081"]
+  Gateway --> ServiceB["Service B :8082"]
+  ServiceA --> Eureka["Eureka Server :8761"]
+  ServiceB --> Eureka
+```
+
+Visão em texto:
+
+```
+    +-------------------+
+    |   Eureka Server   |
+    |     (8761)        |
+    +-------------------+
+       ↑             ↑
+       |             |
+ +-----------+  +-----------+
+ | Service A |  | Service B |
+ |  (8081)   |  |  (8082)   |
+ +-----------+  +-----------+
+       ↑             ↑
+       |             |
+    +-------------------+
+    |     Gateway       |
+    |     (8080)        |
+    +-------------------+
+             ↑
+          Cliente
+```
 
 
 ## 🔎 Como funciona
+
 ### 1. Eureka Server (eureka-server)
 
-#### É o servidor de registro de serviços.
+É o servidor de registro de serviços: mantém o catálogo de serviços ativos e permite que outros componentes descubram instâncias pelo nome. Como é o servidor, não se registra em si mesmo (`register-with-eureka: false`, `fetch-registry: false`).
 
-### Configuração principal
-    
-    spring:
-      application:
-        name: eureka-server
-    
-    server:
-      port: 8761
-    
-    eureka:
-      client:
-        register-with-eureka: false
-        fetch-registry: false
+**Configuração principal:**
 
-
-### O que ele faz?
+```yaml
+spring:
+  application:
+    name: eureka-server
+server:
+  port: 8761
+eureka:
+  client:
+    register-with-eureka: false
+    fetch-registry: false
+```
 
 - Mantém um registro de todos os serviços ativos
 - Permite que serviços encontrem outros serviços pelo nome
 
-Disponível em: 
-- http://localhost:8761/
-    
-      register-with-eureka: false
-  #### Porque ele é o servidor, não precisa se registrar.
+**Painel:** http://localhost:8761/
 
 
-## 2. Service A (servicea)
+### 2. Service A (servicea)
 
-    spring:
-      application:
-        name: servicea
-    
-    server:
-      port: 8081
+```yaml
+spring:
+  application:
+    name: servicea
+server:
+  port: 8081
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
+```
 
 - Sobe na porta 8081
 - Se registra automaticamente no Eureka
-- Fica visível no painel do Eureka
+- Endpoint de exemplo: `GET /service-a/helloWorld`
 
 
-## 3. Service B (serviceb)
+### 3. Service B (serviceb)
 
-    spring:
-      application:
-        name: serviceb
-    
-    server:
-      port: 8082
+```yaml
+spring:
+  application:
+    name: serviceb
+server:
+  port: 8082
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
+```
 
 - Sobe na porta 8082
-- Também se registra automaticamente no Eureka
-- Pode descobrir e chamar o servicea pelo nome
+- Se registra automaticamente no Eureka
+- Endpoint de exemplo: `GET /service-b/helloWorld`
 
 
-### 🔁 Fluxo de Funcionamento
+### 4. Gateway (gateway)
 
-- O Eureka Server sobe primeiro.
-- servicea inicia e se registra no Eureka.
-- serviceb inicia e se registra no Eureka.
+Spring Cloud Gateway Server WebMVC como ponto único de entrada. Encaminha o tráfego para os serviços conforme o path.
 
-#### O Eureka passa a saber:
+**Configuração principal (rotas):**
 
-      SERVICEA → localhost:8081
-      SERVICEB → localhost:8082
+```yaml
+spring:
+  application:
+    name: gateway
+  cloud:
+    gateway:
+      server:
+        webmvc:
+          routes:
+            - id: service-a
+              uri: http://localhost:8081
+              predicates:
+                - Path=/service-a/**
+            - id: service-b
+              uri: http://localhost:8082
+              predicates:
+                - Path=/service-b/**
+server:
+  port: 8080
+```
+
+- Sobe na porta 8080
+- `/service-a/**` → encaminha para Service A (8081)
+- `/service-b/**` → encaminha para Service B (8082)
+
+**Acesso via Gateway:**
+
+- http://localhost:8080/service-a/helloWorld → resposta do Service A
+- http://localhost:8080/service-b/helloWorld → resposta do Service B
 
 
-#### Agora, ao invés de chamar:
+### 🔁 Fluxo de funcionamento
 
-    http://localhost:8081
+1. O Eureka Server sobe primeiro (8761).
+2. Service A e Service B iniciam e se registram no Eureka.
+3. O Gateway sobe (8080) e encaminha pedidos conforme as rotas configuradas.
 
-#### Um serviço pode chamar:
+O Eureka mantém o mapeamento:
 
-    http://servicea
+- `servicea` → localhost:8081
+- `serviceb` → localhost:8082
 
-#### E o Eureka resolve automaticamente o endereço.
+Os clientes podem acessar os serviços diretamente pelas portas ou através do Gateway em um único host/porta (8080).
 
 
-### 🚀 Ordem de Execução
+### 🚀 Ordem de execução
 
-- Subir eureka-server
-- Subir servicea
-- Subir serviceb
+1. Subir **eureka-server**
+2. Subir **servicea**
+3. Subir **serviceb**
+4. Subir **gateway**
 
-Acessar o painel:
+Em cada módulo (a partir da raiz do repo):
 
-    http://localhost:8761/
+```bash
+cd eureka-server && mvn spring-boot:run
+cd servicea      && mvn spring-boot:run
+cd serviceb      && mvn spring-boot:run
+cd gateway       && mvn spring-boot:run
+```
+
+**URLs úteis:**
+
+- Painel Eureka: http://localhost:8761/
+- Service A via Gateway: http://localhost:8080/service-a/helloWorld
+- Service B via Gateway: http://localhost:8080/service-b/helloWorld
 
 
 ### 🎯 Benefícios do Service Discovery
 
-- Não precisa fixar IP/porta
-- Facilita escalabilidade
-- Permite múltiplas instâncias do mesmo serviço
-- Base para Load Balancing e Microservices
+- Não é necessário fixar IP/porta nos clientes
+- Facilita escalabilidade e múltiplas instâncias do mesmo serviço
+- Base para load balancing e arquitetura de microserviços
+- Gateway oferece um único ponto de entrada e roteamento centralizado
+
 
 ---
 
-
-| Aplicação     | Função                     | Porta |
-| ------------- | -------------------------- | ----- |
-| eureka-server | Registro de serviços       | 8761  |
-| servicea      | Serviço cliente registrado | 8081  |
-| serviceb      | Serviço cliente registrado | 8082  |
+| Aplicação     | Função                           | Porta |
+| ------------- | -------------------------------- | ----- |
+| eureka-server | Registro de serviços             | 8761  |
+| servicea      | Serviço cliente registrado       | 8081  |
+| serviceb      | Serviço cliente registrado       | 8082  |
+| gateway       | Roteamento e ponto único de acesso | 8080  |
