@@ -126,11 +126,11 @@ spring:
         webmvc:
           routes:
             - id: service-a
-              uri: lb://servicea
+              uri: lb://SERVICEA
               predicates:
                 - Path=/service-a/**
             - id: service-b
-              uri: lb://serviceb
+              uri: lb://SERVICEB
               predicates:
                 - Path=/service-b/**
 eureka:
@@ -142,8 +142,8 @@ server:
 ```
 
 - Sobe na porta 8080 e regista-se no Eureka
-- `/service-a/**` → resolve `lb://servicea` via Eureka e encaminha para Service A
-- `/service-b/**` → resolve `lb://serviceb` via Eureka e encaminha para Service B
+- `/service-a/**` → resolve `lb://SERVICEA` via Eureka e encaminha para Service A
+- `/service-b/**` → resolve `lb://SERVICEB` via Eureka e encaminha para Service B
 
 **Acesso via Gateway:**
 
