@@ -10,5 +10,7 @@ eureka:
     fetch-registry: false
 logging:
   level:
-    com.netflix.eureka: OFF
-    com.netflix.discovery: OFF
+    com.netflix.eureka: DEBUG
+    com.netflix.discovery: DEBUG
+    org.springframework.cloud.gateway: DEBUG
+
