@@ -1,6 +1,8 @@
 
 ## 📌 Spring Cloud Discovery – Exemplo Simples
 
+[![My Skills](https://skillicons.dev/icons?i=spring,maven)](https://skillicons.dev)
+
 Este projeto demonstra o funcionamento do Service Discovery utilizando Spring Cloud Netflix Eureka com três aplicações:
 
 - *eureka-server* → Servidor de descoberta
