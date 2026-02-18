@@ -15,9 +15,10 @@ Este projeto demonstra o funcionamento do Service Discovery utilizando Spring Cl
 ```mermaid
 flowchart LR
   Client --> Gateway["Gateway :8080"]
+  Gateway -->|"resolve instâncias"| Eureka["Eureka Server :8761"]
   Gateway --> ServiceA["Service A :8081"]
   Gateway --> ServiceB["Service B :8082"]
-  ServiceA --> Eureka["Eureka Server :8761"]
+  ServiceA --> Eureka
   ServiceB --> Eureka
 ```
 
@@ -111,9 +112,9 @@ eureka:
 
 ### 4. Gateway (gateway)
 
-Spring Cloud Gateway Server WebMVC como ponto único de entrada. Encaminha o tráfego para os serviços conforme o path.
+Spring Cloud Gateway Server WebMVC como ponto único de entrada. O gateway é também **cliente Eureka**: as rotas usam o esquema `lb://` (`lb://servicea`, `lb://serviceb`) para que os endereços dos serviços sejam resolvidos pela descoberta (Eureka), com possível load balancing entre várias instâncias.
 
-**Configuração principal (rotas):**
+**Configuração principal (rotas e Eureka):**
 
 ```yaml
 spring:
@@ -125,20 +126,24 @@ spring:
         webmvc:
           routes:
             - id: service-a
-              uri: http://localhost:8081
+              uri: lb://servicea
               predicates:
                 - Path=/service-a/**
             - id: service-b
-              uri: http://localhost:8082
+              uri: lb://serviceb
               predicates:
                 - Path=/service-b/**
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
 server:
   port: 8080
 ```
 
-- Sobe na porta 8080
-- `/service-a/**` → encaminha para Service A (8081)
-- `/service-b/**` → encaminha para Service B (8082)
+- Sobe na porta 8080 e regista-se no Eureka
+- `/service-a/**` → resolve `lb://servicea` via Eureka e encaminha para Service A
+- `/service-b/**` → resolve `lb://serviceb` via Eureka e encaminha para Service B
 
 **Acesso via Gateway:**
 
@@ -150,7 +155,7 @@ server:
 
 1. O Eureka Server sobe primeiro (8761).
 2. Service A e Service B iniciam e se registram no Eureka.
-3. O Gateway sobe (8080) e encaminha pedidos conforme as rotas configuradas.
+3. O Gateway sobe (8080), regista-se no Eureka e resolve as rotas `lb://servicea` e `lb://serviceb` consultando o Eureka; encaminha os pedidos para as instâncias descobertas.
 
 O Eureka mantém o mapeamento:
 

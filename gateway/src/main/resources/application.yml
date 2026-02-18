@@ -7,13 +7,18 @@ spring:
         webmvc:
           routes:
             - id: service-a
-              uri: http://localhost:8081
+              uri: lb://SERVICEA
               predicates:
                 - Path=/service-a/**
             - id: service-b
-              uri: http://localhost:8082
+              uri: lb://SERVICEB
               predicates:
                 - Path=/service-b/**
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
 
 server:
   port: 8080
